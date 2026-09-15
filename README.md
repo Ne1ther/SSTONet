@@ -83,7 +83,7 @@ The prepared basis belongs to a specific model checkpoint, geometry, graph, edge
 
 ## Project structure
 
-**The tree below describes the existing research codebase. These directories are not yet present in this public repository.** It provides an implementation map for readers; the public release will contain a curated version of the research software and supporting materials.
+**The tree below outlines the main modules of the research codebase supporting the AST study. These directories are not yet present in this public repository.** It provides an implementation map for readers; the public release will contain a curated version of the research software and supporting materials.
 
 ```text
 SSTONet/
@@ -114,8 +114,7 @@ SSTONet/
 │   ├── plot_temperature_field.py
 │   ├── train_resolution_generalization.py
 │   ├── train_resolution_generalization_gnn.py
-│   ├── ast_revision/               # Repeated-run, statistics, flux, cache studies
-│   └── cja_revision/               # Earlier experiment and analysis utilities
+│   └── ast_revision/               # Repeated-run, statistics, flux, cache studies
 ├── data/
 │   ├── graph/                      # Coordinates, adjacency, component mappings
 │   └── stl_files/                  # Geometry assets used for visualization
@@ -123,7 +122,6 @@ SSTONet/
 ├── tests/                          # Model, trainer, cache, and benchmark checks
 ├── validation/                     # Auxiliary 14-node thermal-network study
 ├── docs/                           # Method notes and manuscript working assets
-├── paper/                          # Earlier manuscript and typesetting assets
 ├── pyproject.toml                  # Package metadata and dependency groups
 └── README.md
 ```
