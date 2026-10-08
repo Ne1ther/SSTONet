@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use SSTONet in research, please cite the associated paper."
+type: software
+title: SSTONet
+version: 0.1.0
+url: "https://github.com/Ne1ther/SSTONet"
+license: MIT
+authors:
+  - family-names: Xu
+    given-names: Chang
+    orcid: "https://orcid.org/0009-0005-6018-9137"
+preferred-citation:
+  type: article
+  title: "Satellite Temperature Field Prediction under Varying Thermal Contact Conditions Using Topology-Aware Operator Learning"
+  journal: "Aerospace Science and Technology"
+  year: 2026
+  doi: "10.1016/j.ast.2026.114015"
+  authors:
+    - family-names: Xu
+      given-names: Chang
+    - family-names: Yang
+      given-names: Haibo
+    - family-names: Wu
+      given-names: Qianliang
+    - family-names: Liu
+      given-names: Zhanxiao
+    - family-names: Zhou
+      given-names: Changsheng

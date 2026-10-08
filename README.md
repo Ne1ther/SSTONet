@@ -2,236 +2,192 @@
 
 **Topology-aware operator learning for satellite steady-state temperature fields.**
 
-SSTONet learns to reconstruct the full temperature field of a satellite as its operating conditions, optical properties, and thermal contacts change. The project combines a graph-based spatial representation with operator learning to support repeated thermal-design assessments, including temperature errors at individual components and their interfaces.
+Source-code companion to [Satellite Temperature Field Prediction under Varying Thermal Contact Conditions Using Topology-Aware Operator Learning](https://doi.org/10.1016/j.ast.2026.114015), published in *Aerospace Science and Technology*.
 
-> **Release status:** This repository currently contains the project overview only. The source code, trained model weights, and access to the associated dataset will be made publicly available here **after the manuscript is accepted for publication in Aerospace Science and Technology (AST)**. The research implementation and data are not yet released.
+This repository provides the model implementations, principal training configurations, and self-contained tests. **Pretrained weights, simulation datasets, and generated experiment outputs are not included.** Training creates your own local checkpoints; those files are excluded from Git.
 
-[Research overview](#research-overview) · [Architecture](#architecture) · [Project structure](#project-structure) · [Research workflow](#research-workflow) · [Results](#results) · [NXOpen companion](#nxopen-companion) · [Release plan](#release-plan)
+## Model overview
 
-## Research overview
+SSTONet predicts a nodal temperature field by combining two representations:
 
-Thermal design often requires evaluating many combinations of component power, surface properties, solar direction, and contact conditions for the same satellite assembly. High-fidelity simulation provides detailed temperature fields, but repeated solves are expensive. Full-field prediction helps engineers inspect local hot and cold regions, compare component responses, and identify temperature differences across connected parts.
+- An MLP **Branch** maps each operating input to field coefficients.
+- A GNN **Trunk** maps fixed node coordinates and graph connectivity to a spatial basis.
+- The inner product of the coefficients and the basis gives the temperature at each node.
 
-SSTONet approximates the steady-state solutions produced by Siemens NX Space Systems Thermal (NX SST). Its spatial representation uses the assembly's connectivity, while its operating-condition encoder accounts for changing thermal inputs. The engineering goal is fast, locally informative assessment within the sampled operating domain of a fixed satellite model.
+**SSTONet-FEM** uses supplied finite-element adjacency. **SSTONet-KNN** builds neighbors within components and radius-based links between components. Graph weights describe geometric proximity; changing thermal-contact values are part of the operating input.
 
-### Reference problem
+For a trained model and a fixed graph, the spatial basis can be prepared once and reused for later operating inputs. The `sstonet.inference` module implements this cache with checks for changes to the model, graph, device, and precision.
 
-| Item | Current study |
-| --- | --- |
-| Physical system | A fixed 1U CubeSat assembly |
-| Reference solver | Siemens NX Space Systems Thermal |
-| Components | 14 |
-| Temperature outputs | 5,928 thermal nodes per case |
-| Reference database | 5,000 simulation cases generated using Latin hypercube sampling |
-| Data split | 4,000 training, 500 validation, and 500 held-out test cases |
-| Engineering input vector | 94 entries describing solar direction, regional powers, optical properties, and contact/coupling values |
-| Incident solar-flux field | 1,328 samples |
-| Temperature-network input | 1,422 entries after combining engineering inputs and flux samples |
+The paper studies a fixed 1U CubeSat with 14 components and 5,928 output nodes. Its temperature-network input combines 94 engineering entries with 1,328 incident solar-flux samples, for 1,422 entries. These dimensions describe the reference problem; the model constructors also accept other input dimensions and node counts.
 
-The 94 engineering entries comprise 3 solar-direction components, 20 regional powers, 28 emissivities, 28 absorptivities, and 15 contact/coupling parameters. These are the expanded model inputs; their count does not represent 94 independently sampled physical variables. The incident-flux samples describe a derived field.
-
-### What the project investigates
-
-- **Temperature-field reconstruction:** learn all nodal temperatures from the operating conditions of the fixed assembly.
-- **Topology-aware spatial encoding:** compare finite-element connectivity with neighborhoods built from coordinates and component labels.
-- **Component and interface accuracy:** examine where errors occur, including predefined thermal-coupling regions.
-- **Repeated online prediction:** estimate incident solar flux and reuse the trained spatial basis across operating cases.
-- **Controlled evaluation:** compare model families, graph choices, edge weighting, training-data size, spatial supervision, and independent training runs.
-
-## Architecture
-
-SSTONet follows the Branch and Trunk factorization used in DeepONet. A multilayer perceptron (MLP) Branch converts each operating input into a vector of coefficients. A graph neural network (GNN) Trunk converts fixed node coordinates and connectivity into a spatial basis. Combining the coefficients with that basis reconstructs the nodal temperature field.
-
-```mermaid
-flowchart TD
-    P["Engineering inputs: 94 entries"] --> U["Assemble and normalize: 1,422 inputs"]
-    P --> S["Solar direction: 3 entries"]
-    S --> Q["Solar-flux predictor: 1,328 samples"]
-    Q --> U
-    U --> B["MLP Branch: operating coefficients"]
-    G["Fixed coordinates and connectivity"] --> T["Graph Trunk: spatial basis"]
-    T --> C["Reuse prepared basis across queries"]
-    B --> R["Inner-product field reconstruction"]
-    C --> R
-    R --> O["Undo normalization: 5,928 temperatures"]
-```
-
-The diagram shows online prediction after training. During offline data generation, NX supplies the incident-flux samples and reference temperature fields. The online solar-flux predictor supplies the corresponding flux inputs for a new operating case.
-
-For a normalized input vector $u$, the temperature network evaluates
-
-$$
-\widehat{T}_i = \sum_{k=1}^{r} b_k(u) \cdot t_k(\mathbf{x}_i,\mathcal{G}) + b_0.
-$$
-
-where $b_k$ are the Branch coefficients, $t_k$ are the graph-based spatial features, and $\mathcal{G}$ is the fixed node graph. The output is then converted back to physical temperature units.
-
-### Two spatial graph variants
-
-| Variant | Graph construction | Role |
-| --- | --- | --- |
-| **SSTONet-FEM** | Adjacency extracted from the finite-element mesh | Uses available mesh connectivity to construct the spatial basis |
-| **SSTONet-KNN** | K-nearest neighbors within each component, with radius-based links between components | Provides a coordinate-and-component alternative when mesh connectivity is unavailable |
-
-The implemented graph layers use geometric edge information to guide spatial encoding. The graph captures local connectivity; it is not the complete NX conductance or radiation-exchange matrix. Changing contact/coupling values enter through the Branch input while the spatial graph remains fixed.
-
-### Reusing the spatial basis
-
-Once a model is trained, its Trunk output can be computed once for the fixed graph. Subsequent operating cases evaluate the Branch and reconstruct the field from the stored basis. This avoids repeating graph propagation in the temperature network.
-
-The prepared basis belongs to a specific model checkpoint, geometry, graph, edge weights, device, and numerical precision. A change to these inputs requires rebuilding it. The engineering inputs and predicted solar-flux field can vary between queries.
-
-## Project structure
-
-**The tree below outlines the main modules of the research codebase supporting the AST study. These directories are not yet present in this public repository.** It provides an implementation map for readers; the public release will contain a curated version of the research software and supporting materials.
+## Repository layout
 
 ```text
-SSTONet/
-├── sstonet/                         # Importable Python package
-│   ├── data/
-│   │   └── loader.py                # NX exports, input assembly, field loading
-│   ├── models/
-│   │   ├── deeponet.py              # DeepONet, MIONet, graph Trunks, full-field GNN
-│   │   ├── graph_utils.py           # Component-aware neighborhood construction
-│   │   ├── dual_graph.py            # Branch-GNN and Dual-Graph comparisons
-│   │   ├── recent_baselines.py      # Geometry, attention, and Fourier adaptations
-│   │   ├── mlp.py                   # Direct temperature-field regression
-│   │   └── pod_mlp.py               # POD analysis and reduced-order regression
-│   ├── training/                   # Model-specific training and evaluation
-│   ├── inference/
-│   │   └── trunk_cache.py           # Prepared Trunk basis and validity checks
-│   ├── benchmarking/               # Online input adapters, timing, run checks
-│   ├── utils/
-│   │   └── metrics.py              # Full-field error metrics
-│   ├── config.py                   # Configuration loading
-│   └── callbacks.py                # Training callbacks
-├── configs/                        # YAML model and experiment settings
+.
+├── sstonet/
+│   ├── models/             # SSTONet and baseline model implementations
+│   ├── training/           # Trainers, normalization, checkpoint save/load
+│   ├── inference/          # Reusable graph-Trunk basis
+│   ├── data/               # NX CSV loader and dataset splitting
+│   ├── utils/              # Temperature-field error metrics
+│   ├── config.py           # YAML configuration support
+│   └── callbacks.py        # Training callbacks
+├── configs/                # Eleven principal model configurations
 ├── scripts/
-│   ├── train.py                    # Shared training entry point
-│   ├── extract_mesh_from_inpf.py   # Mesh extraction and graph preparation
-│   ├── analyze_component_metrics.py
-│   ├── analyze_thermal_coupling.py
-│   ├── plot_temperature_field.py
-│   ├── train_resolution_generalization.py
-│   ├── train_resolution_generalization_gnn.py
-│   └── ast_revision/               # Repeated-run, statistics, flux, cache studies
-├── data/
-│   ├── graph/                      # Coordinates, adjacency, component mappings
-│   └── stl_files/                  # Geometry assets used for visualization
-├── results/                        # Experiment outputs and selected evidence
-├── tests/                          # Model, trainer, cache, and benchmark checks
-├── validation/                     # Auxiliary 14-node thermal-network study
-├── docs/                           # Method notes and manuscript working assets
-├── pyproject.toml                  # Package metadata and dependency groups
+│   └── train.py            # Shared training entry point
+├── examples/
+│   └── quickstart.py       # Synthetic training and cached prediction
+├── tests/                  # Self-contained model and trainer tests
+├── CITATION.cff
+├── LICENSE
+├── pyproject.toml
 └── README.md
 ```
 
-The runtime package, experiment configurations, and executable scripts have separate roles. `sstonet/` contains reusable implementations, `configs/` defines experiments, and `scripts/` connects the implementations to data and output locations. `results/` stores run outputs and selected evidence. Full simulation exports and large checkpoints are managed separately from the small source and configuration files.
+## Installation
 
-### Model names in the implementation
-
-| Research model | Training identifier | Configuration |
-| --- | --- | --- |
-| SSTONet-FEM | `gnn_deeponet` | `configs/gnn_deeponet.yaml` |
-| SSTONet-KNN | `component_gnn_deeponet` | `configs/component_gnn_deeponet.yaml` |
-| Full-field GNN | `pure_gnn` | `configs/pure_gnn.yaml` |
-| Branch-GNN comparison | `branch_gnn_deeponet` | `configs/branch_gnn_deeponet.yaml` |
-| Dual-Graph comparison | `dual_graph_fem` | `configs/dual_graph_fem.yaml` |
-
-The codebase also includes MLP, POD-MLP, DeepONet, POD-DeepONet, MIONet, and task-specific adaptations of geometry-aware, attention-based, and Fourier operator models. POD denotes proper orthogonal decomposition, which represents a temperature field using a compact set of spatial modes.
-
-## Research workflow
-
-### 1. Generate reference simulations
-
-Define the satellite model and parameter ranges in NX SST. Use the [NXOpen companion](#nxopen-companion) to sample operating conditions, update model parameters, run thermal solves, and export temperatures and radiation-related results.
-
-### 2. Prepare inputs, outputs, and graphs
-
-Organize parameter logs and field exports into consistent component and node orders. Assemble the engineering and incident-flux inputs, prepare the FEM or component-aware graph, and apply the recorded train/validation/test split. Preserve the coordinate mappings, input order, normalization information, and units needed to interpret predictions.
-
-### 3. Train and evaluate the temperature models
-
-Use the shared training entry point with a model-specific YAML configuration. The training workflow records configuration snapshots, data-split information, checkpoints, learning histories, and evaluation metrics.
-
-The current command structure is shown below as a **preview for the future release**. Running these commands requires the research source, prepared data, and graph files, which are not available from this public repository yet.
+Use Python 3.10 or newer in an isolated environment. For example:
 
 ```bash
-# SSTONet with FEM adjacency
-python scripts/train.py --model gnn_deeponet --config configs/gnn_deeponet.yaml
-
-# SSTONet with component-aware neighborhoods
-python scripts/train.py --model component_gnn_deeponet --config configs/component_gnn_deeponet.yaml
+git clone https://github.com/Ne1ther/SSTONet.git
+cd SSTONet
+conda create -n sstonet python=3.11
+conda activate sstonet
+python -m pip install -e ".[dev]"
 ```
 
-The software uses Python and PyTorch, with NumPy, pandas, SciPy, scikit-learn, and YAML-based configuration. The release will provide environment instructions and configurable data paths. NX automation runs in the Windows NX / Simcenter 3D environment; surrogate training and prediction use a separate Python environment.
+Core dependencies are PyTorch, NumPy, pandas, SciPy, scikit-learn, matplotlib, PyYAML, and tqdm. TensorBoard is optional:
 
-### 4. Prepare online prediction
+```bash
+python -m pip install -e ".[tensorboard]"
+```
 
-Train the auxiliary solar-flux predictor, load the temperature checkpoint and its preprocessing information, and prepare the fixed graph. For repeated queries, precompute the Trunk basis. Each new query then assembles the predicted flux and engineering inputs, reconstructs the temperature field, and returns temperatures in physical units.
+The release was checked with Python 3.14.4 and PyTorch 2.11.0 on macOS. The self-contained checks use CPU execution. Training can select CPU, CUDA, or Apple MPS according to the available PyTorch backend.
 
-### 5. Inspect accuracy and computational cost
+## Quick start without data or weights
 
-Evaluate full-field metrics together with component and interface errors. The supporting studies examine graph construction, edge weighting, spatial supervision, training-set size, independent training runs, and paired statistical comparisons. Online measurements distinguish temperature-network evaluation from the complete query, including flux prediction and data movement.
+The example creates a small synthetic problem in memory, trains a compact graph model, and checks that cached prediction agrees with ordinary prediction:
 
-The `validation/` study uses a simplified 14-node lumped thermal network as an auxiliary component-level trend check. Full-field surrogate accuracy is evaluated against the 5,928-node NX reference solutions.
+```bash
+python examples/quickstart.py --variant fem
+python examples/quickstart.py --variant knn
+```
 
-## Results
+It saves no files. The generated temperatures exercise the software interface and are not NX solutions or paper benchmark results.
 
-The following values summarize the current manuscript and its recorded experiments. They describe the fixed 1U CubeSat benchmark within its sampled parameter domain.
+## Train on your own data
 
-### Temperature-field accuracy
+The training entry point accepts the NX CSV format described below. Supply the export folder and, for FEM-based models, the matching graph folder:
 
-| Main benchmark model | Mean relative L2 error | RMSE |
-| --- | ---: | ---: |
-| SSTONet-FEM | 0.6224% | 2.2293 K |
-| SSTONet-KNN | 0.6675% | 2.3467 K |
+```bash
+python scripts/train.py \
+  --model gnn_deeponet \
+  --config configs/gnn_deeponet.yaml \
+  --data-dir /path/to/nx_exports \
+  --graph-dir /path/to/graph \
+  --output-dir results/my_run \
+  --device auto
+```
 
-These are the selected seed-42 models evaluated on 500 held-out cases with the benchmark flux inputs. Across three independent training runs on the same split, SSTONet-FEM achieves a relative L2 error of **0.6167 ± 0.0058%**, reported as mean ± sample standard deviation. The experiments also report component errors, interface errors, maximum nodal error, and paired confidence intervals.
+For component-aware neighborhoods:
 
-### Complete online query
+```bash
+python scripts/train.py \
+  --model component_gnn_deeponet \
+  --config configs/component_gnn_deeponet.yaml \
+  --data-dir /path/to/nx_exports \
+  --device auto
+```
 
-| SSTONet-FEM inference mode | Time per case, mean ± sample standard deviation |
-| --- | ---: |
-| Recompute the Trunk for each query | 27.59 ± 1.36 ms |
-| Reuse the prepared Trunk basis | 3.86 ± 1.15 ms |
+`--device auto` selects an available backend. Use `--device cpu`, `--device cuda`, or `--device mps` to choose explicitly. `--epochs` and `--n-samples` override the YAML settings.
 
-These measurements use an Apple M3 Max, PyTorch MPS, FP32, batch size 1, and 50 measurements per mode. Timing starts with the expanded 94-entry engineering vector on the CPU and ends with the temperature field returned to the CPU. It includes solar-flux prediction, input assembly, normalization, temperature reconstruction, and the required device transfers. Model and graph loading, parameter expansion, regional power allocation, and cache construction occur before timing.
+Each run records its effective configuration, exact train/validation/test indices, split hash, training history, error metrics, and locally generated checkpoints. The graph trainers save fitted normalizers with their checkpoints so later predictions can be returned in physical temperature units. Load only checkpoints you generated or trust, because the trainer checkpoint format includes serialized preprocessing objects.
 
-The reference database has an estimated cost of about **750 serial-equivalent hours**, based on 5,000 NX cases at approximately 9 minutes per solve. This is an offline computation estimate. The value of the surrogate depends on repeated use of the prepared database and trained models.
+### Principal configurations
 
-### Scope of the evidence
+| Model | Training identifier and configuration stem |
+| --- | --- |
+| SSTONet-FEM | `gnn_deeponet` |
+| SSTONet-KNN | `component_gnn_deeponet` |
+| Full-field GNN | `pure_gnn` |
+| DeepONet | `deeponet` |
+| POD-DeepONet | `pod_deeponet` |
+| MIONet | `mionet` |
+| MLP | `mlp` |
+| POD-MLP | `pod_mlp` |
+| Geometry-aware operator adaptation | `adapted_geom_deeponet` |
+| Physics-attention adaptation | `adapted_transolver` |
+| Fourier operator adaptation | `adapted_fourier_deeponet` |
 
-The reported results concern steady-state prediction for the same satellite geometry, component partition, and thermal topology used to build the database. Spatial-supervision studies assess reconstruction within that reference geometry. Applying the workflow to a new assembly, a different physical regime, or parameters outside the sampled domain requires additional data and validation.
+For each identifier, the corresponding file is `configs/<identifier>.yaml`. The configurations retain the reference experiments' model and optimizer settings, with portable data paths and automatic device selection. Their standard split is 80% training, 10% validation, and 10% testing. The three adapted baselines are task-specific implementations of the respective model families.
+
+### NX export format
+
+The loader expects case numbers starting at 1. For each case `N`, the export folder contains:
+
+```text
+nx_exports/
+├── Mixed_Coefficient_DOE_for_nx_automation_N_Solar_vector_log.csv
+├── Mixed_Coefficient_DOE_for_nx_automation_N_Load_log.csv
+├── Mixed_Coefficient_DOE_for_nx_automation_N_Optical_log.csv
+├── Mixed_Coefficient_DOE_for_nx_automation_N_Thermal_coupl_log.csv
+└── Mixed_Coefficient_DOE_for_nx_automation_N/
+    └── NodeResults/
+        ├── NodeResult_<component>_Temperature.csv
+        └── Result_<component>_Radiation.csv
+```
+
+| Export | Required fields |
+| --- | --- |
+| Solar vector log | Columns `X`, `Y`, `Z` |
+| Load log | Regional powers in the row `Value` |
+| Optical log | Rows `Top_inf`, `Bot_inf`, `Top_sunabr`, `Bot_sunabr` |
+| Thermal coupling log | Column `value` |
+| Temperature CSV | `Temperature`, `X`, `Y`, `Z` |
+| Radiation CSV | `Incident_Radiative_Flux_SUN(W/mm2)`, `X`, `Y`, `Z` |
+
+Temperature CSV values are Celsius; the loader converts them to Kelvin. The `TEMPERATURE_COMPONENTS` and `RADIATION_COMPONENTS` lists in [loader.py](sstonet/data/loader.py) define the component concatenation order. Within each component, keep the node order consistent across cases, graph indices, and temperature targets.
+
+The Branch input order is solar direction, incident solar flux, regional powers, emissivities, absorptivities, and contact/coupling values. In the reference problem, these groups have 3, 1,328, 20, 28, 28, and 15 entries, respectively.
+
+A supplied FEM graph folder must contain `edge_index.npy`, an integer array of shape `(2, E)` whose indices match the concatenated temperature nodes. Optional `thermal_coupling_mask.npy` enables interface-region metrics. KNN topology is built from raw node coordinates and component labels. Its radius uses the coordinate units of the input geometry.
+
+## Use the model API with array data
+
+For datasets in another format, pass arrays directly to a trainer:
+
+```python
+from sstonet.models import GNNDeepONet
+from sstonet.training import GNNDeepONetTrainer
+
+model = GNNDeepONet(branch_input_dim=X_train.shape[1])
+trainer = GNNDeepONetTrainer(model, device="cpu", use_edge_attr=True)
+trainer.fit(
+    X_train, coords, edge_index, T_train,
+    X_val=X_val, T_val=T_val,
+    epochs=300, batch_size=32,
+)
+T_pred = trainer.predict(X_test, coords, edge_index)
+```
+
+Here `X_train` has shape `(cases, inputs)`, `coords` has shape `(nodes, 3)`, `edge_index` has shape `(2, edges)`, and `T_train` has shape `(cases, nodes)`. Raw model outputs use the trainer's normalized temperature scale; `trainer.predict` reverses that normalization.
+
+For cached inference, `precompute_trunk(model, coords_t, edge_index_t, edge_weight_t)` returns an object with a `predict` method. Use the same normalized coordinates, input normalizer, and geometric edge weights as training. Call `model.eval()` before preparing the cache. The [quick-start example](examples/quickstart.py) shows the complete normalization and reconstruction steps.
+
+## Tests
+
+```bash
+python -m pytest -q
+```
+
+The suite uses synthetic data to check model outputs, graph operations, training, checkpoint round trips, best-validation-state restoration, and cache correctness/invalidation. It requires no NX installation, private dataset, or pretrained model.
 
 ## NXOpen companion
 
-[**NXOpen_satellite**](https://github.com/Ne1ther/NXOpen_satellite) is the companion automation project for Siemens NX / Simcenter 3D. It supports the simulation and data-generation stage of this research and is maintained as a separate repository.
+[**NXOpen_satellite**](https://github.com/Ne1ther/NXOpen_satellite) provides Siemens NX / Simcenter 3D automation for parameter updates, batch simulations, solve orchestration, and result export. It supports reference-data generation and is maintained separately from the neural models here.
 
-| Repository | Responsibility |
-| --- | --- |
-| **SSTONet** | Data preparation for learning, neural surrogate models, training, temperature-field prediction, and accuracy/cost evaluation |
-| **NXOpen_satellite** | Thermal-parameter editing, design-of-experiments batch runs, solver orchestration, and simulation-result export |
+## Citation and license
 
-The companion toolkit provides workflows for optical properties, heat loads, thermal couplings, solar vectors, restartable batch solves, nodal-temperature export, radiation-result export, and offline processing of existing `.bun` result files. Its execution requires a suitable NX / Simcenter 3D installation and the corresponding simulation project.
+Please cite the [associated paper](https://doi.org/10.1016/j.ast.2026.114015) when using this code in research. Machine-readable citation metadata is in [CITATION.cff](CITATION.cff).
 
-**NXOpen_satellite does not contain the SSTONet models, trained weights, or research dataset.** It provides the automation used around the reference solver. See its [English documentation](https://github.com/Ne1ther/NXOpen_satellite#english-readme) for setup and supported workflows.
-
-## Release plan
-
-| Material | Availability |
-| --- | --- |
-| English project overview and implementation map | Available in this README |
-| SSTONet source code and experiment configurations | Planned for public release after AST acceptance |
-| Trained model weights | Planned for public release after AST acceptance |
-| Associated dataset access | To be provided through this repository after AST acceptance |
-| Reproduction instructions, environment details, and usage terms | To accompany the research release |
-| NX / Simcenter 3D automation toolkit | Available separately in [NXOpen_satellite](https://github.com/Ne1ther/NXOpen_satellite) |
-
-The release will organize the software, weights, data-access instructions, and English documentation into a reproducible research package. Proprietary Siemens software and project-specific NX simulation files are outside the promised release materials.
-
-### Associated manuscript
-
-**Satellite Temperature Field Prediction under Varying Thermal Contact Conditions Using Topology-Aware Operator Learning**
-
-The public research release is tied to acceptance in *Aerospace Science and Technology*. Publication details, a DOI, and a citation entry will be added when available.
+The source code is provided under the [MIT License](LICENSE).

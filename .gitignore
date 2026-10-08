@@ -1,0 +1,45 @@
+# Python, environments, and local tools
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage*
+htmlcov/
+*.egg-info/
+build/
+dist/
+.venv/
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/
+
+# User data and all generated experiment outputs
+/data/
+/results/
+/outputs/
+/checkpoints/
+/logs/
+*.log
+*.csv
+*.npy
+*.npz
+*.mat
+*.h5
+*.hdf5
+
+# Model weights and serialized training/preprocessing state
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.pkl
+*.pickle
+*.joblib
+
+# Writing and figure working directories
+/docs/
+/paper/
+/figures/
+/validation/
