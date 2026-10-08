@@ -3,6 +3,7 @@ message: "If you use SSTONet in research, please cite the associated paper."
 type: software
 title: SSTONet
 version: 0.1.0
+date-released: "2026-10-09"
 url: "https://github.com/Ne1ther/SSTONet"
 license: MIT
 authors:
@@ -15,6 +16,7 @@ preferred-citation:
   journal: "Aerospace Science and Technology"
   year: 2026
   doi: "10.1016/j.ast.2026.114015"
+  url: "https://www.sciencedirect.com/science/article/pii/S1270963826023916"
   authors:
     - family-names: Xu
       given-names: Chang

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="280" viewBox="0 0 1120 280" role="img" aria-labelledby="title desc">
+  <title id="title">SSTONet</title>
+  <desc id="desc">Topology-aware operator learning for satellite temperature fields. A geometric mesh and connected nodes illustrate the spatial representation.</desc>
+  <defs>
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M28 0H0V28" fill="none" stroke="#cbd6cc" stroke-width="0.7" opacity="0.45"/>
+    </pattern>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e5ede3"/>
+      <stop offset="1" stop-color="#d0e2d6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1120" height="280" rx="12" fill="#f5f4ee"/>
+  <rect x="690" y="0" width="430" height="280" rx="12" fill="url(#grid)"/>
+  <path d="M48 36H80" stroke="#26796d" stroke-width="3"/>
+  <text x="94" y="41" font-family="Arial,Helvetica,sans-serif" font-size="12" letter-spacing="2.1" fill="#46615b">SATELLITE THERMAL ANALYSIS</text>
+  <text x="44" y="131" font-family="Arial,Helvetica,sans-serif" font-size="76" font-weight="700" letter-spacing="-2" fill="#173a36">SSTONet</text>
+  <text x="49" y="170" font-family="Arial,Helvetica,sans-serif" font-size="21" fill="#405a55">Topology-aware thermal operator learning</text>
+  <text x="49" y="235" font-family="Arial,Helvetica,sans-serif" font-size="13" letter-spacing="0.5" fill="#657771">AEROSPACE SCIENCE AND TECHNOLOGY · 2026</text>
+  <path d="M716 53V227" stroke="#d1d9cf"/>
+  <g stroke-linejoin="round">
+    <path d="M864 53L986 97L898 145L776 101Z" fill="#ebeee3" stroke="#829b8a" stroke-width="1.5"/>
+    <path d="M776 101L898 145V235L776 190Z" fill="url(#surface)" stroke="#829b8a" stroke-width="1.5"/>
+    <path d="M898 145L986 97V187L898 235Z" fill="#c1d7cc" stroke="#829b8a" stroke-width="1.5"/>
+    <g fill="none" stroke="#87aa98" stroke-width="1" opacity="0.8">
+      <path d="M817 86L939 130M857 70L979 113M806 112L894 63M847 127L935 79"/>
+      <path d="M817 116V205M857 131V220M776 131L898 175M776 161L898 205"/>
+      <path d="M927 129V219M957 113V203M898 175L986 127M898 205L986 157"/>
+    </g>
+    <g fill="none" stroke="#276f62" stroke-width="2">
+      <path d="M817 116L857 161L817 175L857 220M857 161L898 175L927 159L957 173"/>
+      <path d="M857 161L857 131L898 145L927 129"/>
+    </g>
+    <g fill="#216e62" stroke="#f5f4ee" stroke-width="2">
+      <circle cx="817" cy="116" r="4.5"/><circle cx="857" cy="131" r="4.5"/>
+      <circle cx="857" cy="161" r="5.5"/><circle cx="817" cy="175" r="4.5"/>
+      <circle cx="857" cy="220" r="4.5"/><circle cx="898" cy="145" r="4.5"/>
+      <circle cx="898" cy="175" r="4.5"/><circle cx="927" cy="129" r="4.5"/>
+      <circle cx="927" cy="159" r="4.5"/>
+    </g>
+    <circle cx="957" cy="173" r="5.5" fill="#c79a47" stroke="#f5f4ee" stroke-width="2"/>
+    <path d="M991 220H1052" stroke="#8da293" stroke-width="1"/>
+    <text x="1022" y="240" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="11" letter-spacing="1" fill="#5b7466">TOPOLOGY → FIELD</text>
+  </g>
+</svg>

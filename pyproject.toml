@@ -36,6 +36,7 @@ tensorboard = ["tensorboard>=2.15"]
 [project.urls]
 Repository = "https://github.com/Ne1ther/SSTONet"
 Paper = "https://doi.org/10.1016/j.ast.2026.114015"
+"Publisher article" = "https://www.sciencedirect.com/science/article/pii/S1270963826023916"
 "NXOpen companion" = "https://github.com/Ne1ther/NXOpen_satellite"
 
 [tool.setuptools.packages.find]
