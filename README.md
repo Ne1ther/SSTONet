@@ -3,17 +3,30 @@
 <img src="assets/readme-banner.svg" alt="SSTONet: topology-aware thermal operator learning" width="100%">
 
 [![Paper DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.ast.2026.114015-26796D?style=flat-square)](https://doi.org/10.1016/j.ast.2026.114015)
-[![Release](https://img.shields.io/badge/release-v0.1.0-405A55?style=flat-square)](https://github.com/Ne1ther/SSTONet/releases/tag/v0.1.0)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-687B75?style=flat-square)](#installation)
+[![Release](https://img.shields.io/badge/release-v0.1.1-405A55?style=flat-square)](https://github.com/Ne1ther/SSTONet/releases/tag/v0.1.1)
+[![Tested Python](https://img.shields.io/badge/tested_Python-3.14.4-687B75?style=flat-square)](#installation)
 [![License](https://img.shields.io/badge/license-MIT-A5803E?style=flat-square)](LICENSE)
 
-**Research code for satellite steady-state temperature-field prediction.**
+**Research code for satellite steady-state temperature-field prediction.**<br>
+<sub>Small satellite. Many temperatures. Two toolboxes.</sub>
 
 [Paper](https://www.sciencedirect.com/science/article/pii/S1270963826023916) · [Quick start](#quick-start-without-data-or-weights) · [Training](#train-on-your-own-data) · [NXOpen companion](#nxopen-companion) · [Citation](#citation-and-license)
 
 </div>
 
 ---
+
+## Two repositories, one thermal workflow
+
+<img src="assets/thermal-workflow.svg" alt="NXOpen simulates and exports cases; SSTONet learns and predicts temperature fields" width="100%">
+
+| 🛰️ Simulate | 🌡️ Learn and predict |
+| :--- | :--- |
+| [**NXOpen_satellite**](https://github.com/Ne1ther/NXOpen_satellite) | **SSTONet · this repository** |
+| Update thermal parameters, run NX / Simcenter 3D solves, and export reference cases. | Load case exports, train graph-aware operators, and reconstruct nodal temperature fields. |
+| Requires Windows and Siemens NX / Simcenter 3D. | Uses Python and PyTorch. The synthetic examples and tests run without NX. |
+
+**The handoff is the exported case data:** engineering-input logs, incident-flux samples, nodal temperatures, and consistent coordinates/node ordering. The [NX export format](#train-on-your-own-data) explains the loader conventions. NXOpen is the simulation companion, not a Python runtime dependency of SSTONet.
 
 ## The paper
 
@@ -69,33 +82,61 @@ The `sstonet.inference` module provides the reusable Trunk cache. Its validity c
 ## Release scope
 
 > [!NOTE]
-> **v0.1.0 is a source-code release.** It includes model implementations, eleven principal configurations, training and inference utilities, synthetic examples, and self-contained tests. Pretrained weights, simulation datasets, generated outputs, and manuscript working materials are not distributed.
+> **v0.1.1 is a source-code release.** It includes model implementations, eleven principal configurations, training and inference utilities, synthetic examples, and self-contained tests. Pretrained weights, simulation datasets, generated outputs, and manuscript working materials are not distributed.
 
 Training creates your own local checkpoints and fitted normalizers under the output directory. Data and generated artifacts are excluded from Git. Reference-data generation uses the separate [NXOpen_satellite](https://github.com/Ne1ther/NXOpen_satellite) toolkit; the neural models here run in a Python environment.
 
 ## Installation
 
-Use Python 3.10 or newer in an isolated environment. For example:
+### Recommended: the verified environment
+
+The source-release checks use **Python 3.14.4 and PyTorch 2.11.0**. [environment.yml](environment.yml) records the tested Python and direct library versions, with conda managing Python and the scientific packages.
 
 ```bash
 git clone https://github.com/Ne1ther/SSTONet.git
 cd SSTONet
-conda create -n sstonet python=3.11
+conda env create --file environment.yml
 conda activate sstonet
-python -m pip install -e ".[dev]"
 ```
 
-Core dependencies are PyTorch, NumPy, pandas, SciPy, scikit-learn, matplotlib, PyYAML, and tqdm. TensorBoard is optional:
+The environment definition installs the local package in editable mode. To use an existing Python 3.14.4 environment instead:
+
+```bash
+python -m pip install -r requirements-tested.txt
+python -m pip install -e .
+```
+
+<details>
+<summary><strong>Tested versions and compatibility notes</strong></summary>
+
+| Dependency | Verified version |
+| :--- | :--- |
+| Python | 3.14.4 |
+| PyTorch | 2.11.0 |
+| NumPy | 2.4.4 |
+| pandas | 3.0.2 |
+| SciPy | 1.17.1 |
+| scikit-learn | 1.8.0 |
+| matplotlib | 3.10.9 |
+| PyYAML | 6.0.3 |
+| tqdm | 4.67.3 |
+| pytest | 9.0.3 |
+
+[requirements-tested.txt](requirements-tested.txt) is a direct-dependency snapshot, not a complete platform-independent lockfile. The package metadata allows Python 3.10 or newer as a language lower bound; older Python/dependency combinations have not been validated for this release.
+
+The checks use CPU on macOS. CUDA and Apple MPS require a suitable [PyTorch installation](https://pytorch.org/get-started/locally/); the training CLI can select those backends. This repository does not require NX, PyTorch Geometric, or `torch_scatter`.
+
+</details>
+
+TensorBoard logging is optional:
 
 ```bash
 python -m pip install -e ".[tensorboard]"
 ```
 
-The release was checked with Python 3.14.4 and PyTorch 2.11.0 on macOS. The self-contained checks use CPU execution. Training can select CPU, CUDA, or Apple MPS according to the available PyTorch backend.
-
 ## Quick start without data or weights
 
-The example creates a small synthetic problem in memory, trains a compact graph model, and checks that cached prediction agrees with ordinary prediction:
+🛰️ **Take a tiny test flight.** The example creates a small synthetic problem in memory, trains a compact graph model, and checks that cached prediction agrees with ordinary prediction:
 
 ```bash
 python examples/quickstart.py --variant fem
@@ -117,12 +158,14 @@ It saves no files. The generated temperatures exercise the software interface an
 │   ├── config.py           # YAML configuration support
 │   └── callbacks.py        # Training callbacks
 ├── configs/                # Eleven principal model configurations
-├── assets/                 # README banner
+├── assets/                 # README illustrations
 ├── scripts/
 │   └── train.py            # Shared training entry point
 ├── examples/
 │   └── quickstart.py       # Synthetic training and cached prediction
 ├── tests/                  # Self-contained model and trainer tests
+├── environment.yml         # Verified conda environment
+├── requirements-tested.txt # Verified direct Python dependencies
 ├── CITATION.cff
 ├── LICENSE
 ├── pyproject.toml
@@ -246,7 +289,7 @@ The suite uses synthetic data to check model outputs, graph operations, training
 
 ## NXOpen companion
 
-[**NXOpen_satellite**](https://github.com/Ne1ther/NXOpen_satellite) provides Siemens NX / Simcenter 3D automation for parameter updates, batch simulations, solve orchestration, and result export. It supports reference-data generation and is maintained separately from the neural models here.
+For new reference simulations, use [**NXOpen_satellite**](https://github.com/Ne1ther/NXOpen_satellite). Its automation handles parameter updates, design-of-experiments batches, solve orchestration, and result export inside NX / Simcenter 3D. Return here to train the neural operators and evaluate their temperature fields. The two repositories keep their own installation requirements and work together through the exported case data.
 
 ## Citation and license
 

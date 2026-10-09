@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use SSTONet in research, please cite the associated paper."
 type: software
 title: SSTONet
-version: 0.1.0
+version: 0.1.1
 date-released: "2026-10-09"
 url: "https://github.com/Ne1ther/SSTONet"
 license: MIT
